@@ -80,6 +80,10 @@ class Analog_Out_2_Channels_8bit:
 		'''
 		return self.shiftregister.get()
 
+	def latch(self):
+		self.copy_bytearray_into_hardware(self.dataarray())
+		print('actual bytes',self.dataarray())
+
 	def copy_hardware_into_bytearray(self, byte_array):
 		''' fills the actual hardware values into the corrosponding byte array
 		'''
@@ -220,8 +224,8 @@ def send_bit(bit):
 
 def send_byte(byte_out):
 	for i in range(8):
-		send_bit(byte_out & 1)  # lowest bit set?
-		byte_out = byte_out // 2  # integer division
+		send_bit(byte_out & 0x80)  # highest bit set?
+		byte_out = byte_out << 1  # next bit
 
 
 # set the local hardware to the
@@ -279,6 +283,9 @@ while True:
 	if clk_in_signal_pos_edge:
 		data_out_signal = local_hardware.shiftregister.shift(data_in_signal)
 
+	if latch_in_signal_pos_edge:
+		local_hardware.latch()
+
 	# passthrough the bits to the output, if permitted
 	# set the data pin first
 	#print('set data_out_signal', data_out_signal)
@@ -305,12 +312,12 @@ while True:
 					val_out &= 255  # mask out everything > 255
 				except:
 					val_out = 0
-				print('Länge der Internen hardware',
-					  len(local_hardware_bytearray))
 				if value_counter >= len(local_hardware_bytearray):
 					send_byte(val_out)
 				else:
 					local_hardware_bytearray[value_counter] = val_out
+			latch_high(True)
+			latch_low(True)
 			bus_down()  # switch the bus signals off after a transfer sequence
 			local_hardware.copy_bytearray_into_hardware(
 				local_hardware_bytearray)

@@ -1,7 +1,7 @@
-# Valuebus
+# Valuepipe
 
 ## The Priciple
-Valuebus consist of three signals: `data`, `clk` and `latch`, exactly like a shift register
+Valuepipe consist of three signals: `data`, `clk` and `latch`, exactly like a shift register
 
 ### Initialization
 In normal operation `clk` and `latch` appears never at the same time. This is used during the initialisation: When the controller receives a init command, it sets first `clk` and then `latch` on high. This indicates to all clients to clear their shift registers.
