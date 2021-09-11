@@ -113,125 +113,223 @@ class Analog_Out_2_Channels_8bit:
 					spi.write(bytes_out)
 
 
-# the serial protocol stuff
+class ValuePipe:
+	'''
+	talks between multiple controllers by using GPIOs as serial ring bus, handle commands coming from the serial terminal
+	'''
 
 
-def signal_pin(pin, value):
-	pin.value = value
+	# the serial protocol stuff
 
 
-def wait_for_correct_signal_level(pin, level, pin_name):
-	err_trials = 1000
-	while pin.value != level:
-		time.sleep(0.001)
-		err_trials -= 1
-		if not err_trials:  # to many trials, error
-			print('Signal error: {0} has permanent {1}'.format(
-				pin_name, not level))
-			return False
-	# print('correct level: {0} has  {1} with err_trials {2}'.format(pin_name, level,err_trials))
-	return True
+	def signal_pin(self, pin, value):
+		pin.value = value
 
 
-def clk_out(value, controller):
-	signal_pin(clk_out_pin, value)
-	if controller:
-		wait_for_correct_signal_level(clk_in_pin, value, 'clk')
+	def wait_for_correct_signal_level(self, pin, level, pin_name):
+		err_trials = 1000
+		while pin.value != level:
+			time.sleep(0.001)
+			err_trials -= 1
+			if not err_trials:  # to many trials, error
+				print('Signal error: {0} has permanent {1}'.format(
+					pin_name, not level))
+				return False
+		# print('correct level: {0} has  {1} with err_trials {2}'.format(pin_name, level,err_trials))
+		return True
 
 
-def clk_high(controller=False):
-	clk_out(True, controller)
+	def clk_out(self, value, controller):
+		self.signal_pin(clk_out_pin, value)
+		if controller:
+			self.wait_for_correct_signal_level(clk_in_pin, value, 'clk')
 
 
-def clk_low(controller=False):
-	clk_out(False, controller)
+	def clk_high(self, controller=False):
+		self.clk_out(True, controller)
 
 
-def data_out(value, controller):
-	led.value = value
-	signal_pin(data_out_pin, value)
-	# wait_for_correct_signal_level(data_in_pin, value, 'data')
+	def clk_low(self, controller=False):
+		self.clk_out(False, controller)
 
 
-def data_high(controller=False):
-	data_out(True, controller)
+	def data_out(self, value, controller):
+		if self.led:
+			self.led.value = value
+		self.signal_pin(data_out_pin, value)
+		# wait_for_correct_signal_level(data_in_pin, value, 'data')
 
 
-def data_low(controller=False):
-	data_out(False, controller)
+	def data_high(self, controller=False):
+		self.data_out(True, controller)
 
 
-def latch_out(value, controller):
-	signal_pin(latch_out_pin, value)
-	if controller:
-		wait_for_correct_signal_level(latch_in_pin, value, 'latch')
+	def data_low(self, controller=False):
+		self.data_out(False, controller)
 
 
-def latch_high(controller=False):
-	latch_out(True, controller)
+	def latch_out(self, value, controller):
+		self.signal_pin(latch_out_pin, value)
+		if controller:
+			self.wait_for_correct_signal_level(latch_in_pin, value, 'latch')
 
 
-def latch_low(controller=False):
-	latch_out(False, controller)
+	def latch_high(self, controller=False):
+		self.latch_out(True, controller)
 
 
-def clk():
-	return clk_in_pin.value
+	def latch_low(self, controller=False):
+		self.latch_out(False, controller)
 
 
-def data():
-	return data_in_pin.value
+	def clk(self):
+		return self.clk_in_pin.value
 
 
-def latch():
-	return latch_in_pin.value
+	def data(self):
+		return self.data_in_pin.value
 
 
-def bus_down():
-	# just a helper routine to switch off all bus signals, if actual not used
-	latch_low()
-	clk_low()
-	data_low()
+	def latch(self):
+		return self.latch_in_pin.value
 
 
-def init_master():
-	print("init command detected, starting Master initialisation")
-	# play the reset sequence by set clk and latch at the same time
-	clk_high(True)
-	latch_high(True)
-	latch_low(True)
-	clk_low(True)
-	data_high(True)  # set the data line on high
-	tick_counter = 0
-	while not data() and tick_counter < max_bytes_of_byte_field:
-		clk_high(True)
-		clk_low(True)
-		tick_counter += 1
-	print('tick_counter', tick_counter)
-
-	bus_down()  # switch the bus signals off
-	return tick_counter -1
+	def bus_down(self):
+		# just a helper routine to switch off all bus signals, if actual not used
+		self.latch_low()
+		self.clk_low()
+		self.data_low()
 
 
-def send_bit(bit):
-	if bit:
-		data_high(True)
-	else:
-		data_low(True)
-	clk_high(True)
-	clk_low(True)
+	def init_master(self):
+		print("init command detected, starting Master initialisation")
+		# play the reset sequence by set clk and latch at the same time
+		self.clk_high(True)
+		self.latch_high(True)
+		self.latch_low(True)
+		self.clk_low(True)
+		self.data_high(True)  # set the data line on high
+		tick_counter = 0
+		while not self.data() and tick_counter < max_bytes_of_byte_field:
+			self.clk_high(True)
+			self.clk_low(True)
+			tick_counter += 1
+		print('tick_counter', tick_counter)
+
+		self.bus_down()  # switch the bus signals off
+		return tick_counter -1
 
 
-def send_byte(byte_out):
-	for i in range(8):
-		send_bit(byte_out & 0x80)  # highest bit set?
-		byte_out = byte_out << 1  # next bit
+	def send_bit(self, bit):
+		if bit:
+			self.data_high(True)
+		else:
+			self.data_low(True)
+		self.clk_high(True)
+		self.clk_low(True)
 
+
+	def send_byte(self, byte_out):
+		for i in range(8):
+			self.send_bit(byte_out & 0x80)  # highest bit set?
+			byte_out = byte_out << 1  # next bit
+
+	def __init__(self,
+		clk_in_pin,
+		data_in_pin,
+		latch_in_pin,
+		clk_out_pin,
+		data_out_pin,
+		latch_out_pin,
+		led=None
+	) -> None:
+		self.clk_in_pin = clk_in_pin
+		self.data_in_pin = data_in_pin
+		self.latch_in_pin = latch_in_pin
+		self.clk_out_pin = clk_out_pin
+		self.data_out_pin = data_out_pin
+		self.latch_out_pin =latch_out_pin
+		self.led=led
+
+	def run(self,local_hardware):
+		print('Start- please remember that the first input line can contain garbage...')
+		input_chars = ''
+		clk_in_signal_edge_detection = False
+		data_in_signal_edge_detection = False
+		latch_in_signal_edge_detection = False
+		data_out_signal = False
+		while True:
+			# read the input signals as Bool
+			clk_in_signal = self.clk()
+			data_in_signal = self.data()
+			latch_in_signal = self.latch()
+
+			# edge detection
+			clk_in_signal_pos_edge = clk_in_signal and not clk_in_signal_edge_detection
+			data_in_signal_pos_edge = data_in_signal and not data_in_signal_edge_detection
+			latch_in_signal_pos_edge = latch_in_signal and not latch_in_signal_edge_detection
+
+			# store signals
+			clk_in_signal_edge_detection = clk_in_signal
+			data_in_signal_edge_detection = data_in_signal
+			latch_in_signal_edge_detection = latch_in_signal
+
+			# reset command?
+			if clk_in_signal and latch_in_signal_pos_edge:  # reset
+				print("Reset")
+				local_hardware.reset()
+				continue
+
+			# prepare an output
+
+			if clk_in_signal_pos_edge:
+				data_out_signal = local_hardware.shiftregister.shift(data_in_signal)
+
+			if latch_in_signal_pos_edge:
+				local_hardware.latch()
+
+			# passthrough the bits to the output, if permitted
+			# set the data pin first
+			#print('set data_out_signal', data_out_signal)
+			self.data_out(data_out_signal, False)
+			self.clk_out(clk_in_signal, False)
+			self.latch_out(latch_in_signal, False)
+
+			# handle serial input in case we are the master
+			nr_of_chars = supervisor.runtime.serial_bytes_available
+			if nr_of_chars:
+				input_chars += sys.stdin.read(nr_of_chars)
+				while '\n' in input_chars:
+					local_hardware_bytearray = local_hardware.dataarray()
+					line = input_chars[:input_chars.find('\n')+1]
+					input_chars = input_chars[input_chars.find('\n')+1:]
+					line = line.lower().strip()
+					if line == 'init':
+						self.init_master()
+					values = line.split()
+					for value_counter in range(len(values)):
+						this_val = values[value_counter].strip()
+						try:
+							val_out = int(this_val)
+							val_out &= 255  # mask out everything > 255
+						except:
+							val_out = 0
+						if value_counter >= len(local_hardware_bytearray):
+							self.send_byte(val_out)
+						else:
+							local_hardware_bytearray[value_counter] = val_out
+					self.latch_high(True)
+					self.latch_low(True)
+					self.bus_down()  # switch the bus signals off after a transfer sequence
+					local_hardware.copy_bytearray_into_hardware(
+						local_hardware_bytearray)
+			else:
+				time.sleep(0.001)
 
 # set the local hardware to the
 local_hardware = Analog_Out_2_Channels_8bit()
 
-#
+# set up the bus pins
 
 led = digitalio.DigitalInOut(board.LED)
 led.direction = digitalio.Direction.OUTPUT
@@ -250,76 +348,14 @@ data_out_pin.switch_to_output(drive_mode=digitalio.DriveMode.OPEN_DRAIN)
 latch_out_pin = digitalio.DigitalInOut(board.GP8)
 latch_out_pin.switch_to_output(drive_mode=digitalio.DriveMode.OPEN_DRAIN)
 
-print('Start- please remember that the first input line can contain garbage...')
-input_chars = ''
-clk_in_signal_edge_detection = False
-data_in_signal_edge_detection = False
-latch_in_signal_edge_detection = False
-data_out_signal = False
-while True:
-	# read the input signals as Bool
-	clk_in_signal = clk()
-	data_in_signal = data()
-	latch_in_signal = latch()
+vp= ValuePipe(
+	clk_in_pin,
+	data_in_pin,
+	latch_in_pin,
+	clk_out_pin,
+	data_out_pin,
+	latch_out_pin,
+	led
+)
 
-	# edge detection
-	clk_in_signal_pos_edge = clk_in_signal and not clk_in_signal_edge_detection
-	data_in_signal_pos_edge = data_in_signal and not data_in_signal_edge_detection
-	latch_in_signal_pos_edge = latch_in_signal and not latch_in_signal_edge_detection
-
-	# store signals
-	clk_in_signal_edge_detection = clk_in_signal
-	data_in_signal_edge_detection = data_in_signal
-	latch_in_signal_edge_detection = latch_in_signal
-
-	# reset command?
-	if clk_in_signal and latch_in_signal_pos_edge:  # reset
-		print("Reset")
-		local_hardware.reset()
-		continue
-
-	# prepare an output
-
-	if clk_in_signal_pos_edge:
-		data_out_signal = local_hardware.shiftregister.shift(data_in_signal)
-
-	if latch_in_signal_pos_edge:
-		local_hardware.latch()
-
-	# passthrough the bits to the output, if permitted
-	# set the data pin first
-	#print('set data_out_signal', data_out_signal)
-	data_out(data_out_signal, False)
-	clk_out(clk_in_signal, False)
-	latch_out(latch_in_signal, False)
-
-	# handle serial input in case we are the master
-	nr_of_chars = supervisor.runtime.serial_bytes_available
-	if nr_of_chars:
-		input_chars += sys.stdin.read(nr_of_chars)
-		while '\n' in input_chars:
-			local_hardware_bytearray = local_hardware.dataarray()
-			line = input_chars[:input_chars.find('\n')+1]
-			input_chars = input_chars[input_chars.find('\n')+1:]
-			line = line.lower().strip()
-			if line == 'init':
-				init_master()
-			values = line.split()
-			for value_counter in range(len(values)):
-				this_val = values[value_counter].strip()
-				try:
-					val_out = int(this_val)
-					val_out &= 255  # mask out everything > 255
-				except:
-					val_out = 0
-				if value_counter >= len(local_hardware_bytearray):
-					send_byte(val_out)
-				else:
-					local_hardware_bytearray[value_counter] = val_out
-			latch_high(True)
-			latch_low(True)
-			bus_down()  # switch the bus signals off after a transfer sequence
-			local_hardware.copy_bytearray_into_hardware(
-				local_hardware_bytearray)
-	else:
-		time.sleep(0.001)
+vp.run(local_hardware)
